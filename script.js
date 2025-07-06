@@ -3541,6 +3541,93 @@ function showExportJsonPopup() {
     popup.id = 'exportJsonPopup';
     popup.className = 'popup';
     popup.innerHTML = `
+        <style>
+            .popup {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.6);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 1000;
+            }
+            .popup-content {
+                background: #ffffff;
+                padding: 24px;
+                border-radius: 10px;
+                max-width: 450px;
+                width: 90%;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            }
+            .popup-content h3 {
+                margin: 0 0 12px;
+                font-size: 20px;
+                color: #1a1a1a;
+                font-weight: 600;
+            }
+            .popup-content p {
+                margin: 0 0 16px;
+                font-size: 14px;
+                color: #d32f2f;
+                font-weight: 500;
+            }
+            .popup-content label {
+                display: block;
+                margin-bottom: 8px;
+                font-size: 15px;
+                color: #1a1a1a;
+                font-weight: 500;
+            }
+            .popup-content input[type="text"] {
+                width: 100%;
+                padding: 10px;
+                margin-bottom: 20px;
+                border: 1px solid #ccc;
+                border-radius: 6px;
+                font-size: 14px;
+                box-sizing: border-box;
+                box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+                transition: border-color 0.3s;
+            }
+            .popup-content input[type="text"]:focus {
+                border-color: #4CAF50;
+                outline: none;
+            }
+            .popup-actions {
+                display: flex;
+                justify-content: flex-end;
+                gap: 12px;
+            }
+            .popup-actions button {
+                padding: 10px 20px;
+                border: none;
+                border-radius: 6px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+                transition: background-color 0.3s, transform 0.1s;
+            }
+            .popup-actions button:first-child {
+                background-color: #4CAF50;
+                color: #ffffff;
+            }
+            .popup-actions button:first-child:hover {
+                background-color: #45a049;
+                transform: translateY(-1px);
+            }
+            .popup-actions button:last-child {
+                background-color: #f44336;
+                color: #ffffff;
+            }
+            .popup-actions button:last-child:hover {
+                background-color: #d32f2f;
+                transform: translateY(-1px);
+            }
+        </style>
         <div class="popup-content">
             <h3>Xuất dữ liệu lên GitHub Gist</h3>
             <p style="color: red;">Lưu ý: Dữ liệu cũ trong Gist sẽ bị ghi đè!</p>
@@ -3555,7 +3642,6 @@ function showExportJsonPopup() {
     document.body.appendChild(popup);
     document.getElementById('gistTokenInput').focus();
 }
-
 function saveAndExportToGist() {
     const token = document.getElementById('gistTokenInput').value.trim();
     if (token) {
