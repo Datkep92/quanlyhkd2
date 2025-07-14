@@ -2,88 +2,89 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Quản lý Hóa đơn & Tồn kho</title>
-  <link rel="stylesheet" href="styles.css">
-  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.min.js"></script>
-  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+  <title>Đọc hóa đơn từ ZIP và tính tổng đúng</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
 </head>
 <body>
-  <div class="container">
-   <div class="sidebar">
-  <input type="file" id="pdfInput" accept="application/pdf" multiple>
-  <div id="status"></div>
-  <input type="text" id="searchInput" placeholder="Tìm kiếm Hộ Kinh Doanh...">
-  
-  <div id="searchResults"></div>
-  <div id="businessList"></div>
-</div>
-    
-    <div class="main-content">
-      <div id="invoiceInfo"></div>
-      <div id="businessDetails">
-        <h4>Chi tiết Hộ Kinh Doanh</h4>
-        <!-- Đã xóa phần tabs từ đây -->
-        
-        <table id="invoiceTable">
-          <thead>
-            <tr id="headerRow"></tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-        <div id="autoInvoiceTotal">Tổng tiền: 0 VND</div>
-      </div>
-      
-      <!-- Các tab content -->
-      <div id="inventoryTab" class="tab-content"></div>
-      <div id="invoicesTab" class="tab-content hidden"></div>
-      <div id="priceListTab" class="tab-content hidden"></div>
-      <div id="exportHistoryTab" class="tab-content hidden"></div>
-      <div id="exportTab" class="tab-content hidden"></div>
-      
-      <div id="invoiceDetails" class="section"></div>
-
-      <div id="manualInventoryForm" class="section hidden">
-        <h4>Nhập Tồn kho Thủ công</h4>
-        <table class="compact-table">
-          <thead>
-            <tr>
-              <th>Tên hàng hóa</th><th>Đơn vị</th><th>Số lượng</th><th>Đơn giá</th><th>Thuế suất</th><th>Thành tiền</th><th>Thao tác</th>
-            </tr>
-          </thead>
-          <tbody id="manualInventoryItemsBody"></tbody>
-        </table>
-        <div class="controls">
-          <button onclick="addManualInventoryItem()">➕ Thêm sản phẩm</button>
-          <button onclick="saveManualInventory()">💾 Lưu</button>
-          <button onclick="hideManualInventoryForm()">❌ Hủy</button>
-        </div>
-      </div>
-
-      <textarea id="pdfTextArea" style="display:none;"></textarea>
-    </div>
-  </div>
+  <h2>📦 Đọc hóa đơn XML trong file ZIP và tính tổng thủ công</h2>
+  <input type="file" id="zipFileInput" accept=".zip" />
+  <div id="output"></div>
 
   <script>
-    let selectedBusinessId = null;
-    function updateSelectedBusinessId(businessId) {
-      selectedBusinessId = businessId;
-      console.log('Selected business ID updated:', selectedBusinessId); // Debug
-    }
+    document.getElementById('zipFileInput').addEventListener('change', async function(event) {
+      const file = event.target.files[0];
+      if (!file) return;
 
-    // Đảm bảo hàm showTab được gọi khi click tab
-    document.addEventListener('DOMContentLoaded', () => {
-      updateBusinessList(); // Khởi tạo danh sách HKD
-      const tabs = document.querySelectorAll('.tab-button');
-      tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-          showTab(tab.getAttribute('onclick').match(/showTab\('([^']+)'\)/)[1], tab, selectedBusinessId);
-        });
-      });
+      const zip = await JSZip.loadAsync(file);
+      const xmlFile = Object.values(zip.files).find(f => f.name.endsWith('.xml'));
+      if (!xmlFile) return alert("❌ Không tìm thấy file XML trong ZIP.");
+
+      const xmlText = await xmlFile.async("text");
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(xmlText, "application/xml");
+
+      const items = Array.from(xmlDoc.querySelectorAll("HHDVu"));
+      const tableRows = [];
+      let totalManual = 0;
+
+      for (const item of items) {
+        const stt = item.querySelector("STT")?.textContent || '';
+        const ten = item.querySelector("THHDVu")?.textContent || '';
+        const dvt = item.querySelector("DVTinh")?.textContent || '';
+        const sl = item.querySelector("SLuong")?.textContent || '0';
+        const dg = item.querySelector("DGia")?.textContent || '0';
+        const ck = item.querySelector("STCKhau")?.textContent || '0';
+        const tchat = parseInt(item.querySelector("TChat")?.textContent || '1');
+        let thanhtien = parseFloat(item.querySelector("ThTien")?.textContent || '0');
+
+        if (tchat === 3) thanhtien *= -1; // Dòng chiết khấu → đảo dấu
+
+        totalManual += thanhtien;
+
+        tableRows.push(`
+          <tr>
+            <td>${stt}</td>
+            <td>${ten}</td>
+            <td>${dvt}</td>
+            <td>${sl}</td>
+            <td>${Number(dg).toLocaleString()}</td>
+            <td>${Number(ck).toLocaleString()}</td>
+            <td style="text-align:right">${thanhtien.toLocaleString()}</td>
+            <td>${item.querySelector("TSuat")?.textContent || ''}</td>
+          </tr>
+        `);
+      }
+
+      const tgTThue = parseFloat(xmlDoc.querySelector("TgTThue")?.textContent || '0');
+      const ttCKTMai = parseFloat(xmlDoc.querySelector("TTCKTMai")?.textContent || '0');
+      const tgTTTBSo = parseFloat(xmlDoc.querySelector("TgTTTBSo")?.textContent || '0');
+      const totalFinal = totalManual + tgTThue;
+
+      document.getElementById("output").innerHTML = `
+        <h3>📑 Bảng kê hàng hóa</h3>
+        <table border="1" cellpadding="6" cellspacing="0">
+          <thead>
+            <tr>
+              <th>STT</th><th>Tên hàng hóa</th><th>ĐVT</th><th>SL</th>
+              <th>Đơn giá</th><th>Chiết khấu</th><th>Thành tiền</th><th>Thuế suất</th>
+            </tr>
+          </thead>
+          <tbody>${tableRows.join('')}</tbody>
+        </table>
+        <br/>
+        <h3>🧮 Tính toán tổng</h3>
+        <ul>
+          <li><b>Tổng tiền hàng hóa (tự cộng & có chiết khấu âm):</b> ${totalManual.toLocaleString()} VND</li>
+          <li><b>Thuế GTGT (từ XML TgTThue):</b> ${tgTThue.toLocaleString()} VND</li>
+          <li><b>Chiết khấu TM (TTCKTMai – chỉ tham khảo, KHÔNG trừ):</b> ${ttCKTMai.toLocaleString()} VND</li>
+          <li><b><u>Tổng thanh toán (tính tay):</u></b> <strong>${totalFinal.toLocaleString()} VND</strong></li>
+          <li><b>Tổng trên XML TgTTTBSo:</b> ${tgTTTBSo.toLocaleString()} VND</li>
+          <li><b>✅ ${
+            Math.abs(totalFinal - tgTTTBSo) < 1 ? 'KHỚP' : 'KHÔNG KHỚP'
+          } với số tổng trên hóa đơn</b></li>
+        </ul>
+      `;
     });
   </script>
-  <script src="script.js"></script>
 </body>
 </html>
